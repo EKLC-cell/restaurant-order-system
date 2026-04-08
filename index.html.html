@@ -35,8 +35,8 @@
     </div>
 
     <script>
-        // BURASI ÇOK ÖNEMLİ: Linkin sonunun &output=csv olduğundan emin ol!
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv'; 
+        // KENDİ LİNKİNİ BURAYA YAPIŞTIRMAYI UNUTMA!
+        const CSV_URL = 'BURAYA_KENDI_LINKINI_YAPISTIR'; 
         
         let cart = [];
 
@@ -49,8 +49,7 @@
                 const menu = document.getElementById('menu');
                 menu.innerHTML = '';
                 
-                results.data.forEach(item => {
-                    // Sütun isimlerindeki boşlukları temizleyelim (Trim)
+                results.data.forEach((item, index) => {
                     const cleanItem = {};
                     Object.keys(item).forEach(key => {
                         cleanItem[key.trim().toLowerCase()] = item[key];
@@ -58,17 +57,41 @@
 
                     const name = cleanItem.name;
                     const price = parseFloat(cleanItem.price);
+                    const optionsStr = cleanItem.options; // Opsiyonları çektik
 
                     if (name && !isNaN(price)) {
+                        // Opsiyon Menüsü Oluşturma
+                        let optionsHTML = '';
+                        if (optionsStr && optionsStr.trim() !== '') {
+                            const opts = optionsStr.split(',');
+                            optionsHTML = `<select id="opt-${index}" class="mt-3 w-full border rounded p-2 text-sm text-gray-700 bg-gray-50 focus:outline-none focus:ring-1 focus:ring-green-500">
+                                <option value="0|Standart">Standart (+£0.00)</option>`;
+                            
+                            opts.forEach(opt => {
+                                const parts = opt.split(':');
+                                if (parts.length === 2) {
+                                    const oName = parts[0].trim();
+                                    const oPrice = parseFloat(parts[1]);
+                                    if (!isNaN(oPrice)) {
+                                        optionsHTML += `<option value="${oPrice}|${oName}">${oName} (+£${oPrice.toFixed(2)})</option>`;
+                                    }
+                                }
+                            });
+                            optionsHTML += `</select>`;
+                        }
+
                         menu.innerHTML += `
-                            <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border border-gray-100">
-                                <div>
-                                    <h3 class="font-bold text-gray-800">${name}</h3>
-                                    <p class="text-green-600 font-semibold text-sm">£${price.toFixed(2)}</p>
+                            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h3 class="font-bold text-gray-800">${name}</h3>
+                                        <p class="text-green-600 font-semibold text-sm">£${price.toFixed(2)}</p>
+                                    </div>
+                                    <button onclick="addToCart('${name.replace(/'/g, "\\'")}', ${price}, ${index})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">
+                                        + Ekle
+                                    </button>
                                 </div>
-                                <button onclick="addToCart('${name.replace(/'/g, "\\'")}', ${price})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">
-                                    + Ekle
-                                </button>
+                                ${optionsHTML}
                             </div>
                         `;
                     }
@@ -76,11 +99,29 @@
             }
         });
 
-        function addToCart(name, price) {
-            cart.push({ name, price: parseFloat(price) });
+        // Sepete Ekleme (Opsiyon Hesaplamalı)
+        function addToCart(baseName, basePrice, index) {
+            let finalName = baseName;
+            let finalPrice = basePrice;
+            
+            const optSelect = document.getElementById(`opt-${index}`);
+            
+            if (optSelect) {
+                const selected = optSelect.value.split('|');
+                const oPrice = parseFloat(selected[0]);
+                const oName = selected[1];
+
+                if (oName !== "Standart") {
+                    finalName += ` (${oName})`;
+                    finalPrice += oPrice;
+                }
+            }
+
+            cart.push({ name: finalName, price: parseFloat(finalPrice) });
             updateCart();
         }
 
+        // Sepeti Güncelle
         function updateCart() {
             const cartDiv = document.getElementById('cart');
             const itemsDiv = document.getElementById('cart-items');
@@ -99,11 +140,18 @@
             totalSpan.innerText = '£' + total.toFixed(2);
         }
 
+        // Ödeme ve Sipariş Numarası Üretme
         document.getElementById('pay-btn').onclick = async function() {
             const address = document.getElementById('address').value;
-            const note = document.getElementById('note').value;
+            let note = document.getElementById('note').value;
 
             if (!address) return alert("Lütfen teslimat adresi girin!");
+
+            // 4 Haneli Rastgele Sipariş Numarası Üret
+            const orderNumber = '#' + Math.floor(1000 + Math.random() * 9000);
+            
+            // Notu sipariş numarasıyla birleştir
+            const finalNote = `[SİPARİŞ NO: ${orderNumber}] Müşteri Notu: ${note || 'Not yok'}`;
 
             this.disabled = true;
             this.innerText = "Bağlanıyor...";
@@ -112,7 +160,7 @@
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, address, note })
+                    body: JSON.stringify({ cart, address, note: finalNote }) // Yenilenmiş notu gönderiyoruz
                 });
 
                 const data = await res.json();
