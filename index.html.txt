@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sipariş Ver</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+</head>
+<body class="bg-gray-100 p-5 max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-5 text-center">Sahin Kebab Menu</h1>
+    <div id="menu" class="space-y-4"></div>
+    <div id="cart" class="mt-10 p-4 bg-white rounded-xl shadow-lg hidden">
+        <h2 class="font-bold border-b pb-2">Sepetiniz</h2>
+        <div id="cart-items" class="py-2 text-sm"></div>
+        <textarea id="address" placeholder="Teslimat Adresi" class="w-full border p-2 mt-2 text-sm"></textarea>
+        <input id="note" type="text" placeholder="Sipariş Notu" class="w-full border p-2 mt-2 text-sm">
+        <div class="text-xl font-bold mt-2">Toplam: <span id="total">£0</span></div>
+        <button id="pay-btn" class="w-full bg-green-600 text-white py-3 rounded-lg mt-4 font-bold">ÖDE</button>
+    </div>
+    <script>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv'; 
+        let cart = [];
+        Papa.parse(CSV_URL, { download: true, header: true, complete: (results) => {
+            const menu = document.getElementById('menu');
+            results.data.forEach(item => { if(item.name) menu.innerHTML += `<div class="bg-white p-4 rounded-lg shadow flex justify-between"><div><h3 class="font-bold">${item.name}</h3><p class="text-xs">£${item.price}</p></div><button onclick="add('${item.name}', ${item.price})" class="bg-green-100 px-3 rounded text-green-700 font-bold">+ Ekle</button></div>`; });
+        }});
+        function add(n, p) { cart.push({name: n, price: p}); update(); }
+        function update() {
+            document.getElementById('cart').classList.remove('hidden');
+            const items = document.getElementById('cart-items');
+            items.innerHTML = cart.map(i => `<div>${i.name} - £${i.price}</div>`).join('');
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            document.getElementById('total').innerText = '£' + total.toFixed(2);
+        }
+        document.getElementById('pay-btn').onclick = async () => {
+            const res = await fetch('/api/checkout', { method: 'POST', body: JSON.stringify({ cart, address: document.getElementById('address').value, note: document.getElementById('note').value }), headers: {'Content-Type': 'application/json'} });
+            const data = await res.json(); window.location.href = data.url;
+        };
+    </script>
+</body>
+</html>
