@@ -1,40 +1,132 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sipariş Ver</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hızlı Sipariş - Sahin Kebab</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
-<body class="bg-gray-100 p-5 max-w-md mx-auto">
-    <h1 class="text-2xl font-bold mb-5 text-center">Sahin Kebab Menu</h1>
-    <div id="menu" class="space-y-4"></div>
-    <div id="cart" class="mt-10 p-4 bg-white rounded-xl shadow-lg hidden">
-        <h2 class="font-bold border-b pb-2">Sepetiniz</h2>
-        <div id="cart-items" class="py-2 text-sm"></div>
-        <textarea id="address" placeholder="Teslimat Adresi" class="w-full border p-2 mt-2 text-sm"></textarea>
-        <input id="note" type="text" placeholder="Sipariş Notu" class="w-full border p-2 mt-2 text-sm">
-        <div class="text-xl font-bold mt-2">Toplam: <span id="total">£0</span></div>
-        <button id="pay-btn" class="w-full bg-green-600 text-white py-3 rounded-lg mt-4 font-bold">ÖDE</button>
+<body class="bg-gray-100 p-5 max-w-md mx-auto min-h-screen">
+
+    <h1 class="text-2xl font-bold mb-6 text-center text-green-700">Sahin Kebab Menu</h1>
+    
+    <div id="menu" class="space-y-4">
+        <p class="text-center text-gray-500">Menü yükleniyor...</p>
     </div>
+
+    <div id="cart" class="mt-10 p-5 bg-white rounded-2xl shadow-xl hidden">
+        <h2 class="font-bold border-b pb-3 text-lg">Sepetiniz</h2>
+        <div id="cart-items" class="py-3 text-sm space-y-2"></div>
+        
+        <div class="border-t pt-4 space-y-3">
+            <textarea id="address" placeholder="Teslimat Adresi (Örn: 15 Hertford St, CV1)" class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"></textarea>
+            <input id="note" type="text" placeholder="Sipariş Notu (Örn: Acılı olsun)" class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
+        </div>
+
+        <div class="text-2xl font-extrabold mt-4 flex justify-between items-center">
+            <span>Toplam:</span>
+            <span id="total" class="text-green-700">£0.00</span>
+        </div>
+
+        <button id="pay-btn" class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl mt-6 font-bold text-lg transition-transform active:scale-95">
+            ÖDEMEYE GEÇ
+        </button>
+    </div>
+
     <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv'; 
+        // BURASI ÇOK ÖNEMLİ: Linkin sonunun &output=csv olduğundan emin ol!
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMvMYCDOLiaf2sC5vVtIDHBAZtXAkyWvf4AvIp71E67gdX0X_CW4HK8Blqujk9THnSwMerAywSqBy/pub?gid=0&single=true&output=csv'; 
+        
         let cart = [];
-        Papa.parse(CSV_URL, { download: true, header: true, complete: (results) => {
-            const menu = document.getElementById('menu');
-            results.data.forEach(item => { if(item.name) menu.innerHTML += `<div class="bg-white p-4 rounded-lg shadow flex justify-between"><div><h3 class="font-bold">${item.name}</h3><p class="text-xs">£${item.price}</p></div><button onclick="add('${item.name}', ${item.price})" class="bg-green-100 px-3 rounded text-green-700 font-bold">+ Ekle</button></div>`; });
-        }});
-        function add(n, p) { cart.push({name: n, price: p}); update(); }
-        function update() {
-            document.getElementById('cart').classList.remove('hidden');
-            const items = document.getElementById('cart-items');
-            items.innerHTML = cart.map(i => `<div>${i.name} - £${i.price}</div>`).join('');
-            const total = cart.reduce((s, i) => s + i.price, 0);
-            document.getElementById('total').innerText = '£' + total.toFixed(2);
+
+        // Menüyü Getir
+        Papa.parse(CSV_URL, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                const menu = document.getElementById('menu');
+                menu.innerHTML = '';
+                
+                results.data.forEach(item => {
+                    // Sütun isimlerindeki boşlukları temizleyelim (Trim)
+                    const cleanItem = {};
+                    Object.keys(item).forEach(key => {
+                        cleanItem[key.trim().toLowerCase()] = item[key];
+                    });
+
+                    const name = cleanItem.name;
+                    const price = parseFloat(cleanItem.price);
+
+                    if (name && !isNaN(price)) {
+                        menu.innerHTML += `
+                            <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border border-gray-100">
+                                <div>
+                                    <h3 class="font-bold text-gray-800">${name}</h3>
+                                    <p class="text-green-600 font-semibold text-sm">£${price.toFixed(2)}</p>
+                                </div>
+                                <button onclick="addToCart('${name.replace(/'/g, "\\'")}', ${price})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">
+                                    + Ekle
+                                </button>
+                            </div>
+                        `;
+                    }
+                });
+            }
+        });
+
+        function addToCart(name, price) {
+            cart.push({ name, price: parseFloat(price) });
+            updateCart();
         }
-        document.getElementById('pay-btn').onclick = async () => {
-            const res = await fetch('/api/checkout', { method: 'POST', body: JSON.stringify({ cart, address: document.getElementById('address').value, note: document.getElementById('note').value }), headers: {'Content-Type': 'application/json'} });
-            const data = await res.json(); window.location.href = data.url;
+
+        function updateCart() {
+            const cartDiv = document.getElementById('cart');
+            const itemsDiv = document.getElementById('cart-items');
+            const totalSpan = document.getElementById('total');
+
+            if (cart.length > 0) cartDiv.classList.remove('hidden');
+
+            itemsDiv.innerHTML = cart.map(i => `
+                <div class="flex justify-between text-gray-600">
+                    <span>• ${i.name}</span>
+                    <span class="font-medium">£${i.price.toFixed(2)}</span>
+                </div>
+            `).join('');
+
+            const total = cart.reduce((sum, i) => sum + i.price, 0);
+            totalSpan.innerText = '£' + total.toFixed(2);
+        }
+
+        document.getElementById('pay-btn').onclick = async function() {
+            const address = document.getElementById('address').value;
+            const note = document.getElementById('note').value;
+
+            if (!address) return alert("Lütfen teslimat adresi girin!");
+
+            this.disabled = true;
+            this.innerText = "Bağlanıyor...";
+
+            try {
+                const res = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cart, address, note })
+                });
+
+                const data = await res.json();
+                
+                if (data.url) {
+                    window.location.href = data.url;
+                } else {
+                    throw new Error(data.error || "Ödeme başlatılamadı");
+                }
+            } catch (err) {
+                alert("Hata: " + err.message);
+                this.disabled = false;
+                this.innerText = "ÖDEMEYE GEÇ";
+            }
         };
     </script>
 </body>
