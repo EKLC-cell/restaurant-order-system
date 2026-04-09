@@ -18,7 +18,7 @@
         <h1 class="text-xl font-black tracking-tighter text-green-700">CAFE 81</h1>
     </header>
 
-    <div id="menu" class="p-4 space-y-4 max-w-md mx-auto">
+    <div id="menu" class="p-4 max-w-md mx-auto">
         <div class="flex justify-center py-10 italic text-gray-400">Loading menu...</div>
     </div>
 
@@ -53,40 +53,81 @@
 
     <script>
         // --- KENDİ CSV LİNKİNİ BURAYA YAPIŞTIR ---
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
+        const CSV_URL = 'BURAYA_GOOGLE_SHEET_CSV_LINKINI_YAPISTIR';
+        
         let cart = [];
 
-        Papa.parse(CSV_URL, {
-            download: true, header: true, complete: (res) => {
+        // Cache kırmak için linkin sonuna rastgele sayı ekliyoruz
+        const finalUrl = CSV_URL.includes('?') ? CSV_URL + '&t=' + Date.now() : CSV_URL + '?t=' + Date.now();
+
+        Papa.parse(finalUrl, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: (res) => {
                 const menu = document.getElementById('menu');
                 menu.innerHTML = '';
-                res.data.forEach((item, idx) => {
+                let addedItemsCount = 0;
+
+                res.data.forEach((rawItem, idx) => {
+                    // HAYAT KURTARAN HAMLE: Tüm başlıkların boşluklarını sil, küçük harf yap
+                    const item = {};
+                    for(let key in rawItem) {
+                        if(key) item[key.trim().toLowerCase()] = rawItem[key];
+                    }
+
                     const price = parseFloat(item.price);
+                    
                     if(item.name && !isNaN(price)) {
+                        addedItemsCount++;
                         let optsHTML = '';
-                        if(item.options) {
+                        if(item.options && item.options.trim() !== '') {
                             optsHTML = `<select id="opt-${idx}" class="mt-3 w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-500">
                                 <option value="0|Standard">Standard (+£0.00)</option>`;
                             item.options.split(',').forEach(o => {
-                                const [n, p] = o.split(':');
-                                optsHTML += `<option value="${p.trim()}|${n.trim()}">${n.trim()} (+£${parseFloat(p).toFixed(2)})</option>`;
+                                if(o.includes(':')) {
+                                    const [n, p] = o.split(':');
+                                    optsHTML += `<option value="${p.trim()}|${n.trim()}">${n.trim()} (+£${parseFloat(p).toFixed(2)})</option>`;
+                                }
                             });
                             optsHTML += `</select>`;
                         }
                         menu.innerHTML += `
-                            <div class="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex justify-between items-center gap-4">
-                                <div class="flex-1">
-                                    <h3 class="font-black text-gray-800 leading-tight">${item.name}</h3>
-                                    <p class="text-green-600 font-bold mt-1 text-sm">£${price.toFixed(2)}</p>
+                            <div class="bg-white p-5 mb-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center">
+                                <div class="flex justify-between items-center gap-4">
+                                    <div class="flex-1">
+                                        <h3 class="font-black text-gray-800 leading-tight">${item.name}</h3>
+                                        <p class="text-green-600 font-bold mt-1 text-sm">£${price.toFixed(2)}</p>
+                                    </div>
+                                    <button onclick="addToCart('${item.name.replace(/'/g, "\\'")}', ${price}, ${idx})" class="bg-green-600 text-white min-w-[2.5rem] h-10 rounded-xl font-bold active:scale-90 flex items-center justify-center">+</button>
                                 </div>
-                                <button onclick="addToCart('${item.name.replace(/'/g, "\\'")}', ${price}, ${idx})" class="bg-green-600 text-white w-10 h-10 rounded-xl font-bold active:scale-90">+</button>
                                 ${optsHTML}
                             </div>`;
                     }
                 });
+
+                // HATA YAKALAYICI EKRAN
+                if(addedItemsCount === 0) {
+                    console.log("Gelen Raw Data:", res.data);
+                    menu.innerHTML = `
+                        <div class="bg-red-50 border-2 border-red-200 p-6 rounded-2xl text-center">
+                            <h2 class="text-red-600 font-black text-xl mb-2">⚠️ Hata!</h2>
+                            <p class="text-gray-700 text-sm font-medium">Link çalışıyor ama içinde geçerli "name" ve "price" bulunamadı.</p>
+                            <p class="text-gray-500 text-xs mt-2">Detayları görmek için klavyeden F12'ye basıp 'Console' sekmesine bakabilirsin.</p>
+                        </div>`;
+                }
+            },
+            error: (err) => {
+                document.getElementById('menu').innerHTML = `
+                    <div class="bg-red-50 border-2 border-red-200 p-6 rounded-2xl text-center">
+                        <h2 class="text-red-600 font-black text-xl mb-2">Bağlantı Koptu</h2>
+                        <p class="text-gray-700 text-sm font-medium">CSV linkin okunamıyor. Google Sheets ayarlarından emin ol.</p>
+                        <p class="text-xs text-red-400 mt-2">${err.message}</p>
+                    </div>`;
             }
         });
 
+        // SEPET KODLARI (Aynı tıkır tıkır çalışan versiyon)
         function addToCart(n, p, i) {
             let fn = n, fp = p;
             const opt = document.getElementById(`opt-${i}`);
