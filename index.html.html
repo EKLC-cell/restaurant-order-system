@@ -52,10 +52,10 @@
     </div>
 
     <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
+        const CSV_URL = 'https://corsproxy.io/?' + encodeURIComponent(SHEET_URL);
         let cart = [];
 
-        // DÜZELTİLEN KISIM: önce fetch ile çek, sonra parse et
         fetch(CSV_URL)
             .then(res => res.text())
             .then(csvText => {
