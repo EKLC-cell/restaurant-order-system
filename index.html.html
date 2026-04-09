@@ -7,159 +7,142 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        .cart-open { transform: translateY(0); }
-        .cart-closed { transform: translateY(100%); }
-        body { padding-bottom: 100px; } /* Sepet için boşluk */
+        body { padding-bottom: 120px; background-color: #f9fafb; }
+        .floating-cart { transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .floating-cart.active { transform: translateY(0); }
     </style>
 </head>
-<body class="bg-gray-50 font-sans">
+<body class="font-sans text-gray-900">
 
-    <header class="bg-white p-4 shadow-sm sticky top-0 z-40">
-        <h1 class="text-xl font-black text-center text-gray-800 tracking-tight">CAFE 81</h1>
+    <header class="bg-white p-5 sticky top-0 z-40 border-b border-gray-100 flex justify-center shadow-sm">
+        <h1 class="text-xl font-black tracking-tighter text-green-700">CAFE 81</h1>
     </header>
 
     <div id="menu" class="p-4 space-y-4 max-w-md mx-auto">
-        <p class="text-center text-gray-400">Loading menu...</p>
+        <div class="flex justify-center py-10 italic text-gray-400">Loading menu...</div>
     </div>
 
-    <div id="cart" class="fixed bottom-0 left-0 right-0 z-50 transition-all duration-500 transform translate-y-full">
-        <div class="max-w-md mx-auto bg-white rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-gray-100 p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Your Order 🛒</h2>
-                <button onclick="toggleCart()" class="text-gray-400 p-2">✕</button>
+    <div id="cart" class="fixed bottom-0 left-0 right-0 z-50 floating-cart">
+        <div class="max-w-md mx-auto bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.1)] p-6 pb-8 border-t border-gray-100">
+            <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6"></div>
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h2 class="text-2xl font-black">Your Order 🛒</h2>
+                <button onclick="toggleCart()" class="text-gray-400 font-bold text-xs uppercase">Close</button>
             </div>
-
-            <div id="cart-items" class="max-h-40 overflow-y-auto mb-4 space-y-2 text-sm"></div>
-
+            <div id="cart-items" class="max-h-40 overflow-y-auto mb-6 space-y-3 px-2"></div>
             <div class="space-y-3 mb-6">
-                <input id="address" type="text" placeholder="Delivery Address" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500">
-                <input id="note" type="text" placeholder="Order Note (Optional)" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500">
+                <input id="address" type="text" placeholder="Delivery Address" class="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-green-500">
+                <input id="note" type="text" placeholder="Note (Ex: No garlic)" class="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-green-500">
             </div>
-
             <div class="flex items-center justify-between gap-4">
-                <div class="text-2xl font-black text-green-600" id="total">£0.00</div>
-                <button id="pay-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all uppercase tracking-wider">
-                    Checkout Now
-                </button>
+                <div class="pl-2">
+                    <span class="text-[10px] text-gray-400 font-bold uppercase block">Total</span>
+                    <span class="text-3xl font-black text-green-700" id="total">£0.00</span>
+                </div>
+                <button id="pay-btn" class="flex-1 bg-green-600 text-white py-5 rounded-2xl font-black shadow-xl active:scale-95 transition-all">CHECKOUT</button>
             </div>
         </div>
     </div>
 
-    <div id="cart-trigger" class="fixed bottom-6 right-6 z-40 hidden">
-        <button onclick="toggleCart()" class="bg-green-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
-            <span class="font-bold" id="trigger-total">£0.00</span>
-            <span class="bg-white text-green-600 px-2 py-1 rounded-full text-xs font-black" id="trigger-count">0</span>
+    <div id="cart-trigger" class="fixed bottom-8 right-6 z-40 hidden">
+        <button onclick="toggleCart()" class="bg-black text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold">
+            <span id="trigger-total">£0.00</span>
+            <span class="text-green-400 text-xs">VIEW CART</span>
         </button>
     </div>
 
     <script>
+        // --- KENDİ CSV LİNKİNİ BURAYA YAPIŞTIR ---
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
         let cart = [];
 
-        // Menü Çekme
         Papa.parse(CSV_URL, {
-            download: true, header: true, complete: (results) => {
+            download: true, header: true, complete: (res) => {
                 const menu = document.getElementById('menu');
                 menu.innerHTML = '';
-                results.data.forEach((item, index) => {
+                res.data.forEach((item, idx) => {
                     const price = parseFloat(item.price);
                     if(item.name && !isNaN(price)) {
-                        let optionsHTML = '';
+                        let optsHTML = '';
                         if(item.options) {
-                            optionsHTML = `<select id="opt-${index}" class="mt-2 w-full bg-gray-100 rounded-lg p-2 text-xs">
+                            optsHTML = `<select id="opt-${idx}" class="mt-3 w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-500">
                                 <option value="0|Standard">Standard (+£0.00)</option>`;
-                            item.options.split(',').forEach(opt => {
-                                const [name, p] = opt.split(':');
-                                optionsHTML += `<option value="${p.trim()}|${name.trim()}">${name.trim()} (+£${p.trim()})</option>`;
+                            item.options.split(',').forEach(o => {
+                                const [n, p] = o.split(':');
+                                optsHTML += `<option value="${p.trim()}|${n.trim()}">${n.trim()} (+£${parseFloat(p).toFixed(2)})</option>`;
                             });
-                            optionsHTML += `</select>`;
+                            optsHTML += `</select>`;
                         }
                         menu.innerHTML += `
-                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1 pr-4">
-                                        <h3 class="font-bold text-gray-800 text-lg">${item.name}</h3>
-                                        <p class="text-gray-400 text-xs mt-1 leading-relaxed">${item.description || ''}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-green-600 font-bold mb-2">£${price.toFixed(2)}</p>
-                                        <button onclick="addToCart('${item.name.replace(/'/g, "\\'")}', ${price}, ${index})" class="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-90 transition-all">+ Add</button>
-                                    </div>
+                            <div class="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex justify-between items-center gap-4">
+                                <div class="flex-1">
+                                    <h3 class="font-black text-gray-800 leading-tight">${item.name}</h3>
+                                    <p class="text-green-600 font-bold mt-1 text-sm">£${price.toFixed(2)}</p>
                                 </div>
-                                ${optionsHTML}
+                                <button onclick="addToCart('${item.name.replace(/'/g, "\\'")}', ${price}, ${idx})" class="bg-green-600 text-white w-10 h-10 rounded-xl font-bold active:scale-90">+</button>
+                                ${optsHTML}
                             </div>`;
                     }
                 });
             }
         });
 
-        function addToCart(name, price, index) {
-            let finalName = name;
-            let finalPrice = price;
-            const opt = document.getElementById(`opt-${index}`);
+        function addToCart(n, p, i) {
+            let fn = n, fp = p;
+            const opt = document.getElementById(`opt-${i}`);
             if(opt) {
-                const [p, n] = opt.value.split('|');
-                if(n !== 'Standard') { finalName += ` (${n})`; finalPrice += parseFloat(p); }
+                const [price, name] = opt.value.split('|');
+                if(name !== 'Standard') { fn += ` (${name})`; fp += parseFloat(price); }
             }
-            cart.push({ name: finalName, price: finalPrice });
+            cart.push({name: fn, price: fp});
             updateCart();
-            if(cart.length === 1) toggleCart(); // İlk ürün eklenince sepeti aç
+            if(cart.length === 1) toggleCart();
         }
 
         function updateCart() {
             const itemsDiv = document.getElementById('cart-items');
             const totalSpan = document.getElementById('total');
             const triggerTotal = document.getElementById('trigger-total');
-            const triggerCount = document.getElementById('trigger-count');
             const triggerDiv = document.getElementById('cart-trigger');
 
             itemsDiv.innerHTML = cart.map((i, idx) => `
-                <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-xl text-xs font-bold">
                     <span>${i.name}</span>
                     <div class="flex items-center gap-3">
-                        <span class="font-bold">£${i.price.toFixed(2)}</span>
-                        <button onclick="removeFromCart(${idx})" class="text-red-500 text-lg">×</button>
+                        <span>£${i.price.toFixed(2)}</span>
+                        <button onclick="removeFromCart(${idx})" class="text-red-400 text-lg">×</button>
                     </div>
                 </div>
             `).join('');
 
             const total = cart.reduce((s, i) => s + i.price, 0);
             totalSpan.innerText = triggerTotal.innerText = '£' + total.toFixed(2);
-            triggerCount.innerText = cart.length;
-
             if(cart.length > 0) triggerDiv.classList.remove('hidden');
             else { triggerDiv.classList.add('hidden'); toggleCart(false); }
         }
 
-        function removeFromCart(index) { cart.splice(index, 1); updateCart(); }
-
+        function removeFromCart(idx) { cart.splice(idx, 1); updateCart(); }
         function toggleCart(force) {
-            const cartDiv = document.getElementById('cart');
-            if(force === false || !cartDiv.classList.contains('translate-y-full')) {
-                cartDiv.classList.add('translate-y-full');
-            } else {
-                cartDiv.classList.remove('translate-y-full');
-            }
+            const c = document.getElementById('cart');
+            if(force === false) c.classList.remove('active');
+            else c.classList.toggle('active');
         }
 
         document.getElementById('pay-btn').onclick = async function() {
-            const address = document.getElementById('address').value;
+            const addr = document.getElementById('address').value;
             const note = document.getElementById('note').value;
-            if(!address) return alert("Please enter delivery address!");
-            
-            this.innerText = "Processing...";
+            if(!addr) return alert("Please enter delivery address!");
+            this.innerText = "WAIT...";
             this.disabled = true;
-
-            const orderNo = '#' + Math.floor(1000 + Math.random() * 9000);
             try {
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, address, note: `[ORDER ${orderNo}] ${note}` })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({cart, address: addr, note: `[ID: ${Math.floor(Math.random()*9000)}] ${note}`})
                 });
-                const data = await res.json();
-                if(data.url) window.location.href = data.url;
-            } catch(e) { alert("Error!"); this.disabled = false; this.innerText = "Checkout Now"; }
+                const d = await res.json();
+                if(d.url) window.location.href = d.url;
+            } catch(e) { alert("Error"); this.disabled = false; this.innerText = "CHECKOUT"; }
         };
     </script>
 </body>
