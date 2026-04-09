@@ -2,52 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Merchant Dashboard | Cafe 81</title>
+    <title>Kitchen Dashboard | Cafe 81</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen">
+<body class="bg-slate-950 text-white min-h-screen font-sans">
 
-    <div id="auth-screen" class="flex flex-col items-center justify-center min-h-screen p-6">
-        <div class="bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-700">
-            <h2 id="auth-title" class="text-3xl font-black mb-6 text-center text-green-500 uppercase tracking-widest">Login</h2>
+    <div id="auth-screen" class="flex items-center justify-center min-h-screen p-6">
+        <div class="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-slate-800">
+            <h2 id="auth-title" class="text-3xl font-black mb-2 text-center text-green-500 uppercase italic">Admin Login</h2>
+            <p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Please enter your credentials</p>
             
             <div class="space-y-4">
-                <input id="email" type="email" placeholder="Email Address" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 outline-none focus:border-green-500">
-                <input id="password" type="password" placeholder="Password (Min 8 chars)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 outline-none focus:border-green-500">
+                <input id="email" type="email" placeholder="Email Address" class="w-full bg-slate-800 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-green-500">
+                <input id="password" type="password" placeholder="Password (min 8 chars)" class="w-full bg-slate-800 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-green-500">
                 
-                <div id="register-fields" class="hidden animate-fade-in">
-                    <p class="text-xs text-slate-400 px-2 mt-2">• At least 8 characters<br>• Must include numbers</p>
-                </div>
-
-                <button id="auth-btn" onclick="handleAuth()" class="w-full bg-green-600 p-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-all">SIGN IN</button>
+                <button id="auth-btn" onclick="handleAuth()" class="w-full bg-green-600 p-4 rounded-2xl font-black text-lg hover:bg-green-700 transition-all shadow-xl shadow-green-900/20">LOG IN</button>
                 
-                <p class="text-center text-sm text-slate-400 mt-4">
+                <p class="text-center text-xs text-slate-500 mt-6">
                     <span id="toggle-text">Don't have an account?</span>
-                    <button onclick="toggleMode()" class="text-green-500 font-bold ml-1 hover:underline">Click Here</button>
+                    <button onclick="toggleAuth()" class="text-green-500 font-bold ml-1 hover:underline">Register Now</button>
                 </p>
             </div>
         </div>
     </div>
 
-    <div id="dashboard" class="hidden p-6 max-w-4xl mx-auto">
-        <div class="flex justify-between items-center mb-10 border-b border-slate-700 pb-6">
-            <h1 class="text-3xl font-black text-green-500">LIVE ORDERS ⚡</h1>
-            <button onclick="signOut()" class="bg-red-900/30 text-red-500 px-4 py-2 rounded-lg text-xs font-bold">LOGOUT</button>
+    <div id="dashboard" class="hidden p-6 lg:p-12">
+        <div class="flex justify-between items-center mb-10">
+            <h1 class="text-3xl font-black text-green-500 italic uppercase">Live Orders ⚡</h1>
+            <button onclick="signOut()" class="bg-slate-900 text-red-500 px-6 py-2 rounded-xl text-xs font-bold border border-slate-800">LOGOUT</button>
         </div>
-        <div id="orders-list" class="space-y-4 text-center text-slate-500">Checking for orders...</div>
+        <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </div>
 
-    <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+    <audio id="bell" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
 
     <script>
-        // SUPABASE AYARLARI (KENDİ BİLGİLERİNİ YAPIŞTIR)
-        const SUPABASE_URL = 'accagjutukbtsvfvgmob';
-        const SUPABASE_KEY = 'sb_publishable_PRFTXgcTj6rN91BRNuoYww_ecflfnDy';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // --- BU İKİ SATIRI SUPABASE'DEN ALDIĞIN BİLGİLERLE DOLDUR ---
+        const SB_URL = 'https://accagjutukbtsvfvgmob.supabase.co';
+        const SB_KEY = 'sb_publishable_PRFTXgcTj6rN91BRNuoYww_ecflfnDy';
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-        let isLogin = true;
-        let lastOrderId = null;
+        let isLoginMode = true;
+        let lastId = null;
+
+        function toggleAuth() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('auth-title').innerText = isLoginMode ? "Admin Login" : "Admin Register";
+            document.getElementById('auth-btn').innerText = isLoginMode ? "LOG IN" : "CREATE ACCOUNT";
+            document.getElementById('toggle-text').innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
+        }
 
         async function handleAuth() {
             const email = document.getElementById('email').value;
@@ -55,66 +59,61 @@
 
             if (password.length < 8) return alert("Password must be at least 8 characters!");
 
-            if (isLogin) {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) alert(error.message);
-                else checkSession();
+            if (isLoginMode) {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) alert("Login Error: " + error.message);
+                else checkUser();
             } else {
-                const { data, error } = await supabase.auth.signUp({ email, password });
-                if (error) alert(error.message);
-                else alert("Success! Please check your email for verification link.");
+                const { data, error } = await supabaseClient.auth.signUp({ email, password });
+                if (error) alert("Register Error: " + error.message);
+                else alert("Success! Verification email sent. Check your inbox.");
             }
         }
 
-        function toggleMode() {
-            isLogin = !isLogin;
-            document.getElementById('auth-title').innerText = isLogin ? "Login" : "Register";
-            document.getElementById('auth-btn').innerText = isLogin ? "SIGN IN" : "CREATE ACCOUNT";
-            document.getElementById('toggle-text').innerText = isLogin ? "Don't have an account?" : "Already have an account?";
-            document.getElementById('register-fields').classList.toggle('hidden');
-        }
-
-        async function checkSession() {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
+        async function checkUser() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
                 document.getElementById('auth-screen').remove();
                 document.getElementById('dashboard').classList.remove('hidden');
-                startOrderTracking();
+                startTracking();
             }
         }
 
         async function fetchOrders() {
             const res = await fetch('/api/orders');
             const orders = await res.json();
-            const list = document.getElementById('orders-list');
+            const container = document.getElementById('orders-container');
             
-            if(orders.length === 0) { list.innerHTML = "No paid orders yet."; return; }
+            if (orders.length === 0) {
+                container.innerHTML = `<p class="col-span-full text-center text-slate-700 py-10">No orders yet...</p>`;
+                return;
+            }
 
-            list.innerHTML = orders.map(o => `
-                <div class="bg-slate-800 p-6 rounded-3xl border-l-4 border-green-500 flex justify-between items-center shadow-xl">
-                    <div class="text-left">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xs font-mono text-slate-500">${o.time}</span>
-                            <span class="bg-green-500/10 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded italic">PAID</span>
-                        </div>
-                        <h3 class="text-lg font-bold">${o.items}</h3>
-                        <p class="text-sm text-slate-400 mt-1">${o.note}</p>
-                        <p class="text-xs text-slate-500 mt-2">Total: £${o.amount.toFixed(2)}</p>
+            container.innerHTML = orders.map(o => `
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                    <div class="flex justify-between text-xs text-slate-500 mb-4">
+                        <span>${o.time}</span>
+                        <span class="text-green-500 font-bold uppercase italic">Paid</span>
                     </div>
-                    <button onclick="window.print()" class="bg-white text-black px-6 py-2 rounded-xl font-bold text-sm">PRINT</button>
+                    <h3 class="text-xl font-bold mb-3">${o.items}</h3>
+                    <p class="text-sm text-slate-400 bg-slate-800/50 p-3 rounded-xl italic mb-4">"${o.note}"</p>
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-300">£${o.amount.toFixed(2)}</span>
+                        <button onclick="window.print()" class="bg-white text-black px-4 py-2 rounded-xl text-xs font-black">PRINT</button>
+                    </div>
                 </div>
             `).join('');
 
-            if(orders[0].id !== lastOrderId) {
-                if(lastOrderId !== null) document.getElementById('alert-sound').play();
-                lastOrderId = orders[0].id;
+            if(orders[0].id !== lastId) {
+                if(lastId !== null) document.getElementById('bell').play();
+                lastId = orders[0].id;
             }
         }
 
-        function startOrderTracking() { fetchOrders(); setInterval(fetchOrders, 20000); }
-        async function signOut() { await supabase.auth.signOut(); window.location.reload(); }
-
-        checkSession();
+        function startTracking() { fetchOrders(); setInterval(fetchOrders, 20000); }
+        async function signOut() { await supabaseClient.auth.signOut(); location.reload(); }
+        
+        checkUser(); // Sayfa açılınca oturum var mı bak
     </script>
 </body>
 </html>
