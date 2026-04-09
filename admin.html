@@ -2,118 +2,110 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Kitchen Dashboard | Cafe 81</title>
+    <title>Kitchen Display | Cafe 81</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-950 text-white min-h-screen font-sans">
 
-    <div id="auth-screen" class="flex items-center justify-center min-h-screen p-6">
-        <div class="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-slate-800">
-            <h2 id="auth-title" class="text-3xl font-black mb-2 text-center text-green-500 uppercase italic">Admin Login</h2>
-            <p id="auth-subtitle" class="text-slate-500 text-center mb-8 text-sm">Please enter your credentials</p>
-            
-            <div class="space-y-4">
-                <input id="email" type="email" placeholder="Email Address" class="w-full bg-slate-800 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-green-500">
-                <input id="password" type="password" placeholder="Password (min 8 chars)" class="w-full bg-slate-800 border-none rounded-2xl p-4 outline-none focus:ring-2 focus:ring-green-500">
-                
-                <button id="auth-btn" onclick="handleAuth()" class="w-full bg-green-600 p-4 rounded-2xl font-black text-lg hover:bg-green-700 transition-all shadow-xl shadow-green-900/20">LOG IN</button>
-                
-                <p class="text-center text-xs text-slate-500 mt-6">
-                    <span id="toggle-text">Don't have an account?</span>
-                    <button onclick="toggleAuth()" class="text-green-500 font-bold ml-1 hover:underline">Register Now</button>
-                </p>
+    <div id="login-box" class="flex items-center justify-center min-h-screen p-6">
+        <div class="bg-slate-900 p-10 rounded-[3rem] shadow-2xl w-full max-w-sm border border-slate-800 text-center">
+            <div class="w-16 h-16 bg-green-500 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg shadow-green-900/20">
+                <span class="text-3xl">👨‍🍳</span>
             </div>
+            <h2 class="text-2xl font-black mb-2 tracking-tighter">Kitchen Access</h2>
+            <p class="text-slate-500 text-sm mb-8">Enter your secure terminal pin</p>
+            
+            <input id="pin" type="password" placeholder="••••" class="w-full bg-slate-800 border-none rounded-2xl p-5 text-center text-3xl tracking-[1em] mb-6 focus:ring-2 focus:ring-green-500 outline-none">
+            <button onclick="login()" class="w-full bg-green-600 p-5 rounded-2xl font-black text-lg hover:bg-green-700 transition-all shadow-xl shadow-green-900/20 active:scale-95">OPEN TERMINAL</button>
         </div>
     </div>
 
     <div id="dashboard" class="hidden p-6 lg:p-12">
-        <div class="flex justify-between items-center mb-10">
-            <h1 class="text-3xl font-black text-green-500 italic uppercase">Live Orders ⚡</h1>
-            <button onclick="signOut()" class="bg-slate-900 text-red-500 px-6 py-2 rounded-xl text-xs font-bold border border-slate-800">LOGOUT</button>
+        <div class="flex justify-between items-end mb-12 border-b border-slate-800 pb-6">
+            <div>
+                <h1 class="text-4xl font-black text-green-500 tracking-tighter uppercase italic">Live Kitchen Feed ⚡</h1>
+                <p class="text-slate-500 font-bold mt-2 text-sm flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    SYSTEM ONLINE - WAITING FOR PAID ORDERS
+                </p>
+            </div>
+            <button onclick="location.reload()" class="bg-slate-900 text-slate-400 px-6 py-3 rounded-2xl font-bold text-xs border border-slate-800 hover:text-white transition-all">REFRESH</button>
         </div>
-        <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+        <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
     </div>
 
     <audio id="bell" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
 
     <script>
-        // --- BU İKİ SATIRI SUPABASE'DEN ALDIĞIN BİLGİLERLE DOLDUR ---
-        const SB_URL = 'https://accagjutukbtsvfvgmob.supabase.co';
-        const SB_KEY = 'sb_publishable_PRFTXgcTj6rN91BRNuoYww_ecflfnDy';
-        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-
-        let isLoginMode = true;
         let lastId = null;
+        
+        // --- BURASI SENİN GİZLİ ŞİFREN ---
+        const ADMIN_PASSWORD = "8181"; 
 
-        function toggleAuth() {
-            isLoginMode = !isLoginMode;
-            document.getElementById('auth-title').innerText = isLoginMode ? "Admin Login" : "Admin Register";
-            document.getElementById('auth-btn').innerText = isLoginMode ? "LOG IN" : "CREATE ACCOUNT";
-            document.getElementById('toggle-text').innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
-        }
-
-        async function handleAuth() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            if (password.length < 8) return alert("Password must be at least 8 characters!");
-
-            if (isLoginMode) {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) alert("Login Error: " + error.message);
-                else checkUser();
-            } else {
-                const { data, error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) alert("Register Error: " + error.message);
-                else alert("Success! Verification email sent. Check your inbox.");
-            }
-        }
-
-        async function checkUser() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                document.getElementById('auth-screen').remove();
+        function login() {
+            const enteredPin = document.getElementById('pin').value;
+            if(enteredPin === ADMIN_PASSWORD) {
+                document.getElementById('login-box').remove();
                 document.getElementById('dashboard').classList.remove('hidden');
-                startTracking();
+                init(); // Giriş başarılıysa sistemi başlat
+            } else { 
+                alert("Incorrect Pin! Access Denied."); 
+                document.getElementById('pin').value = ''; // Yanlışsa kutuyu temizle
             }
         }
 
-        async function fetchOrders() {
-            const res = await fetch('/api/orders');
-            const orders = await res.json();
+        async function getOrders() {
+            try {
+                // Stripe'tan başarılı ödemeleri çeken arka plan dosyana bağlanıyoruz
+                const res = await fetch('/api/orders');
+                if(!res.ok) throw new Error("API Error");
+                
+                const data = await res.json();
+                render(data);
+                
+                // Yeni sipariş geldiğinde zil çalması için kontrol
+                if(data.length > 0 && data[0].id !== lastId) {
+                    if(lastId !== null) document.getElementById('bell').play();
+                    lastId = data[0].id;
+                }
+            } catch(e) { 
+                console.error("Siparişler çekilemedi:", e); 
+            }
+        }
+
+        function render(orders) {
             const container = document.getElementById('orders-container');
-            
-            if (orders.length === 0) {
-                container.innerHTML = `<p class="col-span-full text-center text-slate-700 py-10">No orders yet...</p>`;
+            if(orders.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-20 text-slate-700 font-black text-2xl uppercase italic">No paid orders yet...</div>`;
                 return;
             }
 
             container.innerHTML = orders.map(o => `
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
-                    <div class="flex justify-between text-xs text-slate-500 mb-4">
-                        <span>${o.time}</span>
-                        <span class="text-green-500 font-bold uppercase italic">Paid</span>
+                <div class="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-2 h-full bg-green-500"></div>
+                    <div class="flex justify-between items-start mb-6">
+                        <span class="text-slate-500 font-mono text-xs">${o.time}</span>
+                        <span class="bg-green-500/20 text-green-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">PAID</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">${o.items}</h3>
-                    <p class="text-sm text-slate-400 bg-slate-800/50 p-3 rounded-xl italic mb-4">"${o.note}"</p>
+                    <h3 class="text-2xl font-black mb-4 leading-tight text-slate-100">${o.items}</h3>
+                    <div class="bg-slate-800/50 p-4 rounded-2xl mb-6 border border-slate-700/50">
+                        <p class="text-amber-400 text-sm font-bold italic">📝 Note: "${o.note}"</p>
+                    </div>
                     <div class="flex justify-between items-center">
-                        <span class="font-bold text-slate-300">£${o.amount.toFixed(2)}</span>
-                        <button onclick="window.print()" class="bg-white text-black px-4 py-2 rounded-xl text-xs font-black">PRINT</button>
+                        <span class="text-slate-400 font-bold tracking-widest text-lg">£${parseFloat(o.amount).toFixed(2)}</span>
+                        <button onclick="window.print()" class="bg-white text-black px-6 py-3 rounded-2xl font-black text-xs hover:bg-green-400 transition-all shadow-lg active:scale-95">PRINT RECEIPT</button>
                     </div>
                 </div>
             `).join('');
-
-            if(orders[0].id !== lastId) {
-                if(lastId !== null) document.getElementById('bell').play();
-                lastId = orders[0].id;
-            }
         }
 
-        function startTracking() { fetchOrders(); setInterval(fetchOrders, 20000); }
-        async function signOut() { await supabaseClient.auth.signOut(); location.reload(); }
-        
-        checkUser(); // Sayfa açılınca oturum var mı bak
+        // Sistemi 15 saniyede bir otomatik güncelle
+        function init() { 
+            getOrders(); 
+            setInterval(getOrders, 15000); 
+        }
     </script>
 </body>
 </html>
