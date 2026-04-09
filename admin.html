@@ -1,77 +1,120 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MUTFAK PANELİ | Sahin Kebab</title>
+    <title>Merchant Dashboard | Cafe 81</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 text-white p-5 font-sans">
+<body class="bg-slate-900 text-white min-h-screen">
 
-    <div id="login-screen" class="flex flex-col items-center justify-center h-screen">
-        <h2 class="text-2xl mb-4 text-green-400 font-bold tracking-widest">YÖNETİCİ GİRİŞİ</h2>
-        <input id="pass" type="password" placeholder="Şifre Giriniz" class="p-4 rounded bg-slate-800 border border-slate-700 text-center text-2xl outline-none focus:border-green-500">
-        <button onclick="checkPass()" class="mt-4 bg-green-600 px-10 py-3 rounded-full font-bold">GİRİŞ YAP</button>
+    <div id="auth-screen" class="flex flex-col items-center justify-center min-h-screen p-6">
+        <div class="bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-700">
+            <h2 id="auth-title" class="text-3xl font-black mb-6 text-center text-green-500 uppercase tracking-widest">Login</h2>
+            
+            <div class="space-y-4">
+                <input id="email" type="email" placeholder="Email Address" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 outline-none focus:border-green-500">
+                <input id="password" type="password" placeholder="Password (Min 8 chars)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 outline-none focus:border-green-500">
+                
+                <div id="register-fields" class="hidden animate-fade-in">
+                    <p class="text-xs text-slate-400 px-2 mt-2">• At least 8 characters<br>• Must include numbers</p>
+                </div>
+
+                <button id="auth-btn" onclick="handleAuth()" class="w-full bg-green-600 p-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-all">SIGN IN</button>
+                
+                <p class="text-center text-sm text-slate-400 mt-4">
+                    <span id="toggle-text">Don't have an account?</span>
+                    <button onclick="toggleMode()" class="text-green-500 font-bold ml-1 hover:underline">Click Here</button>
+                </p>
+            </div>
+        </div>
     </div>
 
-    <div id="admin-panel" class="hidden">
-        <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
-            <h1 class="text-3xl font-black text-green-500 underline decoration-double">CANLI SİPARİŞLER</h1>
-            <div id="status" class="text-sm bg-slate-800 px-4 py-2 rounded-full text-slate-400 italic">Bağlantı Aktif...</div>
+    <div id="dashboard" class="hidden p-6 max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-10 border-b border-slate-700 pb-6">
+            <h1 class="text-3xl font-black text-green-500">LIVE ORDERS ⚡</h1>
+            <button onclick="signOut()" class="bg-red-900/30 text-red-500 px-4 py-2 rounded-lg text-xs font-bold">LOGOUT</button>
         </div>
-
-        <div id="orders-list" class="grid gap-4">
-            </div>
+        <div id="orders-list" class="space-y-4 text-center text-slate-500">Checking for orders...</div>
     </div>
 
     <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
 
     <script>
+        // SUPABASE AYARLARI (KENDİ BİLGİLERİNİ YAPIŞTIR)
+        const SUPABASE_URL = 'accagjutukbtsvfvgmob';
+        const SUPABASE_KEY = 'sb_publishable_PRFTXgcTj6rN91BRNuoYww_ecflfnDy';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let isLogin = true;
         let lastOrderId = null;
 
-        function checkPass() {
-            if(document.getElementById('pass').value === 'sahin123') { // Burası senin şifren!
-                document.getElementById('login-screen').remove();
-                document.getElementById('admin-panel').classList.remove('hidden');
-                startStalking();
-            } else { alert('Hatalı Şifre!'); }
+        async function handleAuth() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (password.length < 8) return alert("Password must be at least 8 characters!");
+
+            if (isLogin) {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) alert(error.message);
+                else checkSession();
+            } else {
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) alert(error.message);
+                else alert("Success! Please check your email for verification link.");
+            }
+        }
+
+        function toggleMode() {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? "Login" : "Register";
+            document.getElementById('auth-btn').innerText = isLogin ? "SIGN IN" : "CREATE ACCOUNT";
+            document.getElementById('toggle-text').innerText = isLogin ? "Don't have an account?" : "Already have an account?";
+            document.getElementById('register-fields').classList.toggle('hidden');
+        }
+
+        async function checkSession() {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                document.getElementById('auth-screen').remove();
+                document.getElementById('dashboard').classList.remove('hidden');
+                startOrderTracking();
+            }
         }
 
         async function fetchOrders() {
-            try {
-                const res = await fetch('/api/orders');
-                const orders = await res.json();
-                renderOrders(orders);
-                
-                // Yeni sipariş geldi mi kontrol et
-                if(orders.length > 0 && orders[0].id !== lastOrderId) {
-                    if(lastOrderId !== null) document.getElementById('alert-sound').play();
-                    lastOrderId = orders[0].id;
-                }
-            } catch (e) { console.error("Siparişler çekilemedi"); }
-        }
-
-        function renderOrders(orders) {
+            const res = await fetch('/api/orders');
+            const orders = await res.json();
             const list = document.getElementById('orders-list');
+            
+            if(orders.length === 0) { list.innerHTML = "No paid orders yet."; return; }
+
             list.innerHTML = orders.map(o => `
-                <div class="bg-slate-800 p-6 rounded-2xl border-l-8 border-green-500 shadow-2xl flex justify-between items-center animate-pulse-once">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-2">
-                            <span class="text-slate-400 text-sm font-mono">${o.time}</span>
-                            <span class="bg-green-900 text-green-300 px-3 py-1 rounded text-xs font-bold uppercase tracking-tighter">${o.id.slice(-5)}</span>
+                <div class="bg-slate-800 p-6 rounded-3xl border-l-4 border-green-500 flex justify-between items-center shadow-xl">
+                    <div class="text-left">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs font-mono text-slate-500">${o.time}</span>
+                            <span class="bg-green-500/10 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded italic">PAID</span>
                         </div>
-                        <h3 class="text-xl font-bold mb-1">${o.items}</h3>
-                        <p class="text-slate-400 text-sm italic mb-2">${o.note}</p>
-                        <div class="text-green-400 font-bold">Toplam: £${o.amount.toFixed(2)}</div>
+                        <h3 class="text-lg font-bold">${o.items}</h3>
+                        <p class="text-sm text-slate-400 mt-1">${o.note}</p>
+                        <p class="text-xs text-slate-500 mt-2">Total: £${o.amount.toFixed(2)}</p>
                     </div>
-                    <button onclick="window.print()" class="bg-white text-black px-6 py-3 rounded-xl font-black hover:bg-green-400 transition-all">YAZDIR</button>
+                    <button onclick="window.print()" class="bg-white text-black px-6 py-2 rounded-xl font-bold text-sm">PRINT</button>
                 </div>
             `).join('');
+
+            if(orders[0].id !== lastOrderId) {
+                if(lastOrderId !== null) document.getElementById('alert-sound').play();
+                lastOrderId = orders[0].id;
+            }
         }
 
-        function startStalking() {
-            fetchOrders();
-            setInterval(fetchOrders, 20000); // 20 saniyede bir kontrol et
-        }
+        function startOrderTracking() { fetchOrders(); setInterval(fetchOrders, 20000); }
+        async function signOut() { await supabase.auth.signOut(); window.location.reload(); }
+
+        checkSession();
     </script>
 </body>
 </html>
