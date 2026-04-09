@@ -67,12 +67,28 @@
                     const price = parseFloat(item.price);
                     if (item.name && !isNaN(price)) {
                         let optsHTML = '';
-                        if (item.options) {
+
+                        // Tüm kolonları tara, "options" ile başlayanları veya boş olmayan options kolonlarını topla
+                        const allOptions = Object.keys(item)
+                            .filter(key => key.trim().toLowerCase().startsWith('options') || key.trim().toLowerCase() === 'options')
+                            .map(key => item[key])
+                            .filter(val => val && val.trim() !== '');
+
+                        if (allOptions.length > 0) {
+                            // Her hücredeki seçenekleri virgülle birleştir (bazı hücrelerde zaten virgülle ayrılmış olabilir)
+                            const allOptsList = allOptions.join(',').split(',').map(o => o.trim()).filter(o => o !== '');
+
                             optsHTML = `<select id="opt-${idx}" class="mt-3 w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-500">
                                 <option value="0|Standard">Standard (+£0.00)</option>`;
-                            item.options.split(',').forEach(o => {
-                                const [n, p] = o.split(':');
-                                optsHTML += `<option value="${p.trim()}|${n.trim()}">${n.trim()} (+£${parseFloat(p).toFixed(2)})</option>`;
+                            allOptsList.forEach(o => {
+                                const parts = o.split(':');
+                                if (parts.length >= 2) {
+                                    const n = parts[0].trim();
+                                    const p = parseFloat(parts[parts.length - 1].trim());
+                                    if (n && !isNaN(p)) {
+                                        optsHTML += `<option value="${p}|${n}">${n} (+£${p.toFixed(2)})</option>`;
+                                    }
+                                }
                             });
                             optsHTML += `</select>`;
                         }
