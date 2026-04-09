@@ -1,180 +1,165 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hızlı Sipariş - Sahin Kebab</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cafe 81 | Order Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        .cart-open { transform: translateY(0); }
+        .cart-closed { transform: translateY(100%); }
+        body { padding-bottom: 100px; } /* Sepet için boşluk */
+    </style>
 </head>
-<body class="bg-gray-100 p-5 max-w-md mx-auto min-h-screen">
+<body class="bg-gray-50 font-sans">
 
-    <h1 class="text-2xl font-bold mb-6 text-center text-green-700">Sahin Kebab Menu</h1>
-    
-    <div id="menu" class="space-y-4">
-        <p class="text-center text-gray-500">Menü yükleniyor...</p>
+    <header class="bg-white p-4 shadow-sm sticky top-0 z-40">
+        <h1 class="text-xl font-black text-center text-gray-800 tracking-tight">CAFE 81</h1>
+    </header>
+
+    <div id="menu" class="p-4 space-y-4 max-w-md mx-auto">
+        <p class="text-center text-gray-400">Loading menu...</p>
     </div>
 
-    <div id="cart" class="mt-10 p-5 bg-white rounded-2xl shadow-xl hidden">
-        <h2 class="font-bold border-b pb-3 text-lg">Sepetiniz</h2>
-        <div id="cart-items" class="py-3 text-sm space-y-2"></div>
-        
-        <div class="border-t pt-4 space-y-3">
-            <textarea id="address" placeholder="Teslimat Adresi (Örn: 15 Hertford St, CV1)" class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"></textarea>
-            <input id="note" type="text" placeholder="Sipariş Notu (Örn: Acılı olsun)" class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
-        </div>
+    <div id="cart" class="fixed bottom-0 left-0 right-0 z-50 transition-all duration-500 transform translate-y-full">
+        <div class="max-w-md mx-auto bg-white rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Your Order 🛒</h2>
+                <button onclick="toggleCart()" class="text-gray-400 p-2">✕</button>
+            </div>
 
-        <div class="text-2xl font-extrabold mt-4 flex justify-between items-center">
-            <span>Toplam:</span>
-            <span id="total" class="text-green-700">£0.00</span>
-        </div>
+            <div id="cart-items" class="max-h-40 overflow-y-auto mb-4 space-y-2 text-sm"></div>
 
-        <button id="pay-btn" class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl mt-6 font-bold text-lg transition-transform active:scale-95">
-            ÖDEMEYE GEÇ
+            <div class="space-y-3 mb-6">
+                <input id="address" type="text" placeholder="Delivery Address" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500">
+                <input id="note" type="text" placeholder="Order Note (Optional)" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500">
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div class="text-2xl font-black text-green-600" id="total">£0.00</div>
+                <button id="pay-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all uppercase tracking-wider">
+                    Checkout Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cart-trigger" class="fixed bottom-6 right-6 z-40 hidden">
+        <button onclick="toggleCart()" class="bg-green-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
+            <span class="font-bold" id="trigger-total">£0.00</span>
+            <span class="bg-white text-green-600 px-2 py-1 rounded-full text-xs font-black" id="trigger-count">0</span>
         </button>
     </div>
 
     <script>
-        // KENDİ LİNKİNİ BURAYA YAPIŞTIRMAYI UNUTMA!
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv'; 
-        
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
         let cart = [];
 
-        // Menüyü Getir
+        // Menü Çekme
         Papa.parse(CSV_URL, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
+            download: true, header: true, complete: (results) => {
                 const menu = document.getElementById('menu');
                 menu.innerHTML = '';
-                
                 results.data.forEach((item, index) => {
-                    const cleanItem = {};
-                    Object.keys(item).forEach(key => {
-                        cleanItem[key.trim().toLowerCase()] = item[key];
-                    });
-
-                    const name = cleanItem.name;
-                    const price = parseFloat(cleanItem.price);
-                    const optionsStr = cleanItem.options; // Opsiyonları çektik
-
-                    if (name && !isNaN(price)) {
-                        // Opsiyon Menüsü Oluşturma
+                    const price = parseFloat(item.price);
+                    if(item.name && !isNaN(price)) {
                         let optionsHTML = '';
-                        if (optionsStr && optionsStr.trim() !== '') {
-                            const opts = optionsStr.split(',');
-                            optionsHTML = `<select id="opt-${index}" class="mt-3 w-full border rounded p-2 text-sm text-gray-700 bg-gray-50 focus:outline-none focus:ring-1 focus:ring-green-500">
-                                <option value="0|Standart">Standart (+£0.00)</option>`;
-                            
-                            opts.forEach(opt => {
-                                const parts = opt.split(':');
-                                if (parts.length === 2) {
-                                    const oName = parts[0].trim();
-                                    const oPrice = parseFloat(parts[1]);
-                                    if (!isNaN(oPrice)) {
-                                        optionsHTML += `<option value="${oPrice}|${oName}">${oName} (+£${oPrice.toFixed(2)})</option>`;
-                                    }
-                                }
+                        if(item.options) {
+                            optionsHTML = `<select id="opt-${index}" class="mt-2 w-full bg-gray-100 rounded-lg p-2 text-xs">
+                                <option value="0|Standard">Standard (+£0.00)</option>`;
+                            item.options.split(',').forEach(opt => {
+                                const [name, p] = opt.split(':');
+                                optionsHTML += `<option value="${p.trim()}|${name.trim()}">${name.trim()} (+£${p.trim()})</option>`;
                             });
                             optionsHTML += `</select>`;
                         }
-
                         menu.innerHTML += `
-                            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <h3 class="font-bold text-gray-800">${name}</h3>
-                                        <p class="text-green-600 font-semibold text-sm">£${price.toFixed(2)}</p>
+                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1 pr-4">
+                                        <h3 class="font-bold text-gray-800 text-lg">${item.name}</h3>
+                                        <p class="text-gray-400 text-xs mt-1 leading-relaxed">${item.description || ''}</p>
                                     </div>
-                                    <button onclick="addToCart('${name.replace(/'/g, "\\'")}', ${price}, ${index})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-colors">
-                                        + Ekle
-                                    </button>
+                                    <div class="text-right">
+                                        <p class="text-green-600 font-bold mb-2">£${price.toFixed(2)}</p>
+                                        <button onclick="addToCart('${item.name.replace(/'/g, "\\'")}', ${price}, ${index})" class="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-90 transition-all">+ Add</button>
+                                    </div>
                                 </div>
                                 ${optionsHTML}
-                            </div>
-                        `;
+                            </div>`;
                     }
                 });
             }
         });
 
-        // Sepete Ekleme (Opsiyon Hesaplamalı)
-        function addToCart(baseName, basePrice, index) {
-            let finalName = baseName;
-            let finalPrice = basePrice;
-            
-            const optSelect = document.getElementById(`opt-${index}`);
-            
-            if (optSelect) {
-                const selected = optSelect.value.split('|');
-                const oPrice = parseFloat(selected[0]);
-                const oName = selected[1];
-
-                if (oName !== "Standart") {
-                    finalName += ` (${oName})`;
-                    finalPrice += oPrice;
-                }
+        function addToCart(name, price, index) {
+            let finalName = name;
+            let finalPrice = price;
+            const opt = document.getElementById(`opt-${index}`);
+            if(opt) {
+                const [p, n] = opt.value.split('|');
+                if(n !== 'Standard') { finalName += ` (${n})`; finalPrice += parseFloat(p); }
             }
-
-            cart.push({ name: finalName, price: parseFloat(finalPrice) });
+            cart.push({ name: finalName, price: finalPrice });
             updateCart();
+            if(cart.length === 1) toggleCart(); // İlk ürün eklenince sepeti aç
         }
 
-        // Sepeti Güncelle
         function updateCart() {
-            const cartDiv = document.getElementById('cart');
             const itemsDiv = document.getElementById('cart-items');
             const totalSpan = document.getElementById('total');
+            const triggerTotal = document.getElementById('trigger-total');
+            const triggerCount = document.getElementById('trigger-count');
+            const triggerDiv = document.getElementById('cart-trigger');
 
-            if (cart.length > 0) cartDiv.classList.remove('hidden');
-
-            itemsDiv.innerHTML = cart.map(i => `
-                <div class="flex justify-between text-gray-600">
-                    <span>• ${i.name}</span>
-                    <span class="font-medium">£${i.price.toFixed(2)}</span>
+            itemsDiv.innerHTML = cart.map((i, idx) => `
+                <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                    <span>${i.name}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold">£${i.price.toFixed(2)}</span>
+                        <button onclick="removeFromCart(${idx})" class="text-red-500 text-lg">×</button>
+                    </div>
                 </div>
             `).join('');
 
-            const total = cart.reduce((sum, i) => sum + i.price, 0);
-            totalSpan.innerText = '£' + total.toFixed(2);
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            totalSpan.innerText = triggerTotal.innerText = '£' + total.toFixed(2);
+            triggerCount.innerText = cart.length;
+
+            if(cart.length > 0) triggerDiv.classList.remove('hidden');
+            else { triggerDiv.classList.add('hidden'); toggleCart(false); }
         }
 
-        // Ödeme ve Sipariş Numarası Üretme
+        function removeFromCart(index) { cart.splice(index, 1); updateCart(); }
+
+        function toggleCart(force) {
+            const cartDiv = document.getElementById('cart');
+            if(force === false || !cartDiv.classList.contains('translate-y-full')) {
+                cartDiv.classList.add('translate-y-full');
+            } else {
+                cartDiv.classList.remove('translate-y-full');
+            }
+        }
+
         document.getElementById('pay-btn').onclick = async function() {
             const address = document.getElementById('address').value;
-            let note = document.getElementById('note').value;
-
-            if (!address) return alert("Lütfen teslimat adresi girin!");
-
-            // 4 Haneli Rastgele Sipariş Numarası Üret
-            const orderNumber = '#' + Math.floor(1000 + Math.random() * 9000);
+            const note = document.getElementById('note').value;
+            if(!address) return alert("Please enter delivery address!");
             
-            // Notu sipariş numarasıyla birleştir
-            const finalNote = `[SİPARİŞ NO: ${orderNumber}] Müşteri Notu: ${note || 'Not yok'}`;
-
+            this.innerText = "Processing...";
             this.disabled = true;
-            this.innerText = "Bağlanıyor...";
 
+            const orderNo = '#' + Math.floor(1000 + Math.random() * 9000);
             try {
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, address, note: finalNote }) // Yenilenmiş notu gönderiyoruz
+                    body: JSON.stringify({ cart, address, note: `[ORDER ${orderNo}] ${note}` })
                 });
-
                 const data = await res.json();
-                
-                if (data.url) {
-                    window.location.href = data.url;
-                } else {
-                    throw new Error(data.error || "Ödeme başlatılamadı");
-                }
-            } catch (err) {
-                alert("Hata: " + err.message);
-                this.disabled = false;
-                this.innerText = "ÖDEMEYE GEÇ";
-            }
+                if(data.url) window.location.href = data.url;
+            } catch(e) { alert("Error!"); this.disabled = false; this.innerText = "Checkout Now"; }
         };
     </script>
 </body>
