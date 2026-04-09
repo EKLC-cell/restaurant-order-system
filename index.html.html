@@ -52,43 +52,24 @@
     </div>
 
     <script>
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
-        const CSV_URL = 'https://corsproxy.io/?' + encodeURIComponent(SHEET_URL);
+        // --- KENDİ CSV LİNKİNİ BURAYA YAPIŞTIR ---
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMVMYCDOLiaf2sC5vVtiDHBAZtXAokyWvf4AvIp7lE67gdX0x_CW4HK8BlqujK9THn5wMerAywSqBy/pub?gid=0&single=true&output=csv';
         let cart = [];
 
-        fetch(CSV_URL)
-            .then(res => res.text())
-            .then(csvText => {
-                const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        Papa.parse(CSV_URL, {
+            download: true, header: true, complete: (res) => {
                 const menu = document.getElementById('menu');
                 menu.innerHTML = '';
-
-                result.data.forEach((item, idx) => {
+                res.data.forEach((item, idx) => {
                     const price = parseFloat(item.price);
-                    if (item.name && !isNaN(price)) {
+                    if(item.name && !isNaN(price)) {
                         let optsHTML = '';
-
-                        // Tüm kolonları tara, "options" ile başlayanları veya boş olmayan options kolonlarını topla
-                        const allOptions = Object.keys(item)
-                            .filter(key => key.trim().toLowerCase().startsWith('options') || key.trim().toLowerCase() === 'options')
-                            .map(key => item[key])
-                            .filter(val => val && val.trim() !== '');
-
-                        if (allOptions.length > 0) {
-                            // Her hücredeki seçenekleri virgülle birleştir (bazı hücrelerde zaten virgülle ayrılmış olabilir)
-                            const allOptsList = allOptions.join(',').split(',').map(o => o.trim()).filter(o => o !== '');
-
+                        if(item.options) {
                             optsHTML = `<select id="opt-${idx}" class="mt-3 w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-500">
                                 <option value="0|Standard">Standard (+£0.00)</option>`;
-                            allOptsList.forEach(o => {
-                                const parts = o.split(':');
-                                if (parts.length >= 2) {
-                                    const n = parts[0].trim();
-                                    const p = parseFloat(parts[parts.length - 1].trim());
-                                    if (n && !isNaN(p)) {
-                                        optsHTML += `<option value="${p}|${n}">${n} (+£${p.toFixed(2)})</option>`;
-                                    }
-                                }
+                            item.options.split(',').forEach(o => {
+                                const [n, p] = o.split(':');
+                                optsHTML += `<option value="${p.trim()}|${n.trim()}">${n.trim()} (+£${parseFloat(p).toFixed(2)})</option>`;
                             });
                             optsHTML += `</select>`;
                         }
@@ -103,26 +84,19 @@
                             </div>`;
                     }
                 });
-
-                if (menu.innerHTML === '') {
-                    menu.innerHTML = '<div class="flex justify-center py-10 italic text-red-400">Menu could not be loaded. Please check your spreadsheet.</div>';
-                }
-            })
-            .catch(err => {
-                document.getElementById('menu').innerHTML = '<div class="flex justify-center py-10 italic text-red-400">Connection error. Please try again.</div>';
-                console.error('CSV fetch error:', err);
-            });
+            }
+        });
 
         function addToCart(n, p, i) {
             let fn = n, fp = p;
             const opt = document.getElementById(`opt-${i}`);
-            if (opt) {
+            if(opt) {
                 const [price, name] = opt.value.split('|');
-                if (name !== 'Standard') { fn += ` (${name})`; fp += parseFloat(price); }
+                if(name !== 'Standard') { fn += ` (${name})`; fp += parseFloat(price); }
             }
-            cart.push({ name: fn, price: fp });
+            cart.push({name: fn, price: fp});
             updateCart();
-            if (cart.length === 1) toggleCart();
+            if(cart.length === 1) toggleCart();
         }
 
         function updateCart() {
@@ -143,32 +117,32 @@
 
             const total = cart.reduce((s, i) => s + i.price, 0);
             totalSpan.innerText = triggerTotal.innerText = '£' + total.toFixed(2);
-            if (cart.length > 0) triggerDiv.classList.remove('hidden');
+            if(cart.length > 0) triggerDiv.classList.remove('hidden');
             else { triggerDiv.classList.add('hidden'); toggleCart(false); }
         }
 
         function removeFromCart(idx) { cart.splice(idx, 1); updateCart(); }
         function toggleCart(force) {
             const c = document.getElementById('cart');
-            if (force === false) c.classList.remove('active');
+            if(force === false) c.classList.remove('active');
             else c.classList.toggle('active');
         }
 
-        document.getElementById('pay-btn').onclick = async function () {
+        document.getElementById('pay-btn').onclick = async function() {
             const addr = document.getElementById('address').value;
             const note = document.getElementById('note').value;
-            if (!addr) return alert("Please enter delivery address!");
+            if(!addr) return alert("Please enter delivery address!");
             this.innerText = "WAIT...";
             this.disabled = true;
             try {
                 const res = await fetch('/api/checkout', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, address: addr, note: `[ID: ${Math.floor(Math.random() * 9000)}] ${note}` })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({cart, address: addr, note: `[ID: ${Math.floor(Math.random()*9000)}] ${note}`})
                 });
                 const d = await res.json();
-                if (d.url) window.location.href = d.url;
-            } catch (e) { alert("Error"); this.disabled = false; this.innerText = "CHECKOUT"; }
+                if(d.url) window.location.href = d.url;
+            } catch(e) { alert("Error"); this.disabled = false; this.innerText = "CHECKOUT"; }
         };
     </script>
 </body>
